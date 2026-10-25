@@ -1,0 +1,11 @@
+create table if not exists expenses (id uuid primary key default gen_random_uuid(), user_id uuid not null, date date not null, merchant_id uuid, total numeric(12,2) not null, tax numeric(12,2), currency text default 'EUR', category text, subcategory text, payment_method text, receipt_path text, notes text, ai_confidence numeric(5,4), created_at timestamptz default now());
+create table if not exists receipt_items (id uuid primary key default gen_random_uuid(), expense_id uuid references expenses(id) on delete cascade, product_name text not null, quantity numeric(12,3) default 1, unit_price numeric(12,2), total_price numeric(12,2), category text, subcategory text);
+create table if not exists merchants (id uuid primary key default gen_random_uuid(), user_id uuid not null, name text not null, created_at timestamptz default now());
+create table if not exists categories (id uuid primary key default gen_random_uuid(), user_id uuid, name text not null, parent_id uuid references categories(id));
+create table if not exists budgets (id uuid primary key default gen_random_uuid(), user_id uuid not null, category_id uuid, month date not null, amount numeric(12,2) not null);
+alter table expenses enable row level security; alter table receipt_items enable row level security; alter table merchants enable row level security; alter table categories enable row level security; alter table budgets enable row level security;
+create policy "own expenses" on expenses for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy "own merchants" on merchants for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy "own categories" on categories for all using (auth.uid()=user_id or user_id is null) with check (auth.uid()=user_id or user_id is null);
+create policy "own budgets" on budgets for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy "items through expense" on receipt_items for all using (exists(select 1 from expenses e where e.id=expense_id and e.user_id=auth.uid())) with check (exists(select 1 from expenses e where e.id=expense_id and e.user_id=auth.uid()));
